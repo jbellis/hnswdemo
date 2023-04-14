@@ -15,16 +15,17 @@
  * limitations under the License.
  */
 
-package org.example;
+package org.example.lucenecopy;
 
 import java.util.Random;
 import org.apache.lucene.util.ArrayUtil;
 
-class MockVectorValues extends AbstractMockVectorValues<float[]> {
+// copied from Lucene's test suite
+public class MockVectorValues extends AbstractMockVectorValues<float[]> {
     private final float[] scratch;
     private final Random random = new Random();
 
-    static MockVectorValues fromValues(float[][] values) {
+    public static MockVectorValues fromValues(float[][] values) {
         int dimension = values[0].length;
         int maxDoc = values.length;
         float[][] denseValues = new float[maxDoc][];

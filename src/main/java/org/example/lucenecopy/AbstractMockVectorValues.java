@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.example;
+package org.example.lucenecopy;
 
 import static org.apache.lucene.search.DocIdSetIterator.NO_MORE_DOCS;
 
@@ -23,6 +23,7 @@ import java.io.IOException;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.hnsw.RandomAccessVectorValues;
 
+// copied from Lucene's test suite
 abstract class AbstractMockVectorValues<T> implements RandomAccessVectorValues<T> {
 
     protected final int dimension;

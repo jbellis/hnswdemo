@@ -1,17 +1,16 @@
 package org.example;
 
 import org.apache.lucene.index.*;
-import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.util.hnsw.*;
+import org.example.lucenecopy.MockVectorValues;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Random;
 
-public class LuceneHnswExample {
-    private static VectorSimilarityFunction similarityFunction = VectorSimilarityFunction.COSINE;
-    private static Random random = new Random();
+public class SimpleExample {
+    private static final VectorSimilarityFunction similarityFunction = VectorSimilarityFunction.COSINE;
+    private static final Random random = new Random();
 
     public static void main(String[] args) throws IOException {
         // Create a random vector universe

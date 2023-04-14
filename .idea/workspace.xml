@@ -5,21 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="82a58aa4-374f-47f0-ad9f-bca58299e1fb" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/gradle.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/uiDesigner.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/build.gradle" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/gradle/wrapper/gradle-wrapper.jar" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/gradle/wrapper/gradle-wrapper.properties" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/gradlew" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/gradlew.bat" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/settings.gradle" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/org/example/AbstractMockVectorValues.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/org/example/LuceneHnswExample.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/org/example/MockVectorValues.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/org/example/SimpleExample.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/example/SimpleExample.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -85,13 +71,13 @@
     &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;
   }
 }</component>
-  <component name="RunManager" selected="Application.LuceneHnswExample">
-    <configuration name="LuceneHnswExample" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
-      <option name="MAIN_CLASS_NAME" value="org.example.LuceneHnswExample" />
+  <component name="RunManager" selected="Application.SimpleExample">
+    <configuration name="SimpleExample" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
+      <option name="MAIN_CLASS_NAME" value="org.example.SimpleExample" />
       <module name="hnswdemo.main" />
       <extension name="coverage">
         <pattern>
-          <option name="PATTERN" value="org.example.*" />
+          <option name="PATTERN" value="org.example.lucenecopy.*" />
           <option name="ENABLED" value="true" />
         </pattern>
       </extension>
@@ -123,7 +109,7 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="Application.LuceneHnswExample" />
+        <item itemvalue="Application.SimpleExample" />
         <item itemvalue="Gradle.hnswdemo [dependencies]" />
       </list>
     </recent_temporary>

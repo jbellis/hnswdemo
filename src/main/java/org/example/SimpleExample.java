@@ -14,9 +14,10 @@ public class SimpleExample {
 
     public static void main(String[] args) throws IOException {
         // Create a random vector universe
-        int vectorDimensions = 5;
-        var universe = new float[1000][];
-        for (int i = 0; i < 1000; i++) {
+        int vectorDimensions = 1500;
+        int universeSize = 10_000;
+        var universe = new float[universeSize][];
+        for (int i = 0; i < universeSize; i++) {
             universe[i] = randomVector(vectorDimensions);
         }
 

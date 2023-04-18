@@ -5,7 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="82a58aa4-374f-47f0-ad9f-bca58299e1fb" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/src/main/java/org/example/SimpleExample.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/org/example/SimpleExample.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -57,6 +57,15 @@
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="HighlightingSettingsPerFile">
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.apache.lucene/lucene-core/9.5.0/c9201469e46b0fa91d415f80ba5e02bad566596b/lucene-core-9.5.0-sources.jar!/org/apache/lucene/codecs/lucene95/Lucene95HnswVectorsWriter.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.apache.lucene/lucene-core/9.5.0/c9201469e46b0fa91d415f80ba5e02bad566596b/lucene-core-9.5.0-sources.jar!/org/apache/lucene/codecs/lucene95/OffHeapByteVectorValues.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.apache.lucene/lucene-core/9.5.0/c9201469e46b0fa91d415f80ba5e02bad566596b/lucene-core-9.5.0-sources.jar!/org/apache/lucene/codecs/lucene95/OffHeapFloatVectorValues.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.apache.lucene/lucene-core/9.5.0/c9201469e46b0fa91d415f80ba5e02bad566596b/lucene-core-9.5.0-sources.jar!/org/apache/lucene/util/hnsw/HnswGraphSearcher.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.apache.lucene/lucene-core/9.5.0/c9201469e46b0fa91d415f80ba5e02bad566596b/lucene-core-9.5.0-sources.jar!/org/apache/lucene/util/hnsw/NeighborQueue.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.apache.lucene/lucene-core/9.5.0/c9201469e46b0fa91d415f80ba5e02bad566596b/lucene-core-9.5.0-sources.jar!/org/apache/lucene/util/hnsw/OnHeapHnswGraph.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.apache.lucene/lucene-core/9.5.0/c9201469e46b0fa91d415f80ba5e02bad566596b/lucene-core-9.5.0-sources.jar!/org/apache/lucene/util/hnsw/RandomAccessVectorValues.java" root0="SKIP_INSPECTION" />
   </component>
   <component name="ProjectId" id="2OQbd5rr9aQIqEzXjiK23nxz0nH" />
   <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
@@ -124,5 +133,16 @@
       <updated>1681495836857</updated>
     </task>
     <servers />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/src/main/java/org/example/lucenecopy/AbstractMockVectorValues.java</url>
+          <line>89</line>
+          <option name="timeStamp" value="1" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
   </component>
 </project>

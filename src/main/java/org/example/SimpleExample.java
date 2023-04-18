@@ -5,8 +5,8 @@ import org.apache.lucene.util.hnsw.*;
 import org.example.lucenecopy.MockVectorValues;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Random;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class SimpleExample {
     private static final VectorSimilarityFunction similarityFunction = VectorSimilarityFunction.COSINE;
@@ -21,20 +21,31 @@ public class SimpleExample {
             universe[i] = randomVector(vectorDimensions);
         }
 
-        // construct a HNSW graph of the universe
+        System.out.println("Building HNSW graph...");
         var ravv = MockVectorValues.fromValues(universe);
         var builder = HnswGraphBuilder.create(ravv, VectorEncoding.FLOAT32, similarityFunction, 16, 100, random.nextInt());
         var hnsw = builder.build(ravv.copy());
 
         // search for the nearest neighbors of a random vector
-        var queryVector = randomVector(vectorDimensions);
-        NeighborQueue nn = HnswGraphSearcher.search(queryVector, 10, ravv.copy(), VectorEncoding.FLOAT32, similarityFunction, hnsw, null, Integer.MAX_VALUE);
-        System.out.println("Nearest neighbors of " + Arrays.toString(queryVector) + ":");
-        for (var i : nn.nodes()) {
-            var neighbor = universe[i];
-            var similarity = similarityFunction.compare(queryVector, neighbor);
-            System.out.println("  " + Arrays.toString(neighbor) + " (similarity: " + similarity + ")");
+        for (int i = 0; i < 1000; i++) {
+            var queryVector = randomVector(vectorDimensions);
+
+//            bruteSearch(universe, queryVector, 10);
+            hnswSearch(ravv, hnsw, queryVector, 10);
         }
+    }
+
+    private static void bruteSearch(float[][] universe, float[] queryVector, int topK) {
+       var scored = Arrays.stream(universe).map(v -> new AbstractMap.SimpleEntry<>(v, similarityFunction.compare(v, queryVector)))
+               .sorted(Comparator.comparingDouble(entry -> entry.getValue()))
+               .limit(topK)
+               .collect(Collectors.toList());
+       System.out.println(scored.size() + " found");
+    }
+
+    private static void hnswSearch(MockVectorValues ravv, HnswGraph hnsw, float[] queryVector, int topK) throws IOException {
+        NeighborQueue nn = HnswGraphSearcher.search(queryVector, topK, ravv, VectorEncoding.FLOAT32, similarityFunction, hnsw, null, Integer.MAX_VALUE);
+        System.out.println(nn.nodes().length + " found");
     }
 
     private static float[] randomVector(int vectorDimension) {

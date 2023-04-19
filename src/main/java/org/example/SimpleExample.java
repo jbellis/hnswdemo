@@ -48,7 +48,7 @@ public class SimpleExample {
         System.out.println(nn.nodes().length + " found");
     }
 
-    private static float[] randomVector(int vectorDimension) {
+     static float[] randomVector(int vectorDimension) {
         float[] queryVector = new float[vectorDimension];
         for (int i = 0; i < vectorDimension; i++) {
             queryVector[i] = random.nextFloat();

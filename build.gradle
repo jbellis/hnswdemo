@@ -11,6 +11,7 @@ repositories {
 
 dependencies {
     implementation group: 'org.apache.lucene', name: 'lucene-core', version: '9.5.0'
+    implementation group: 'com.github.jelmerk', name: 'hnswlib-core', version: '1.1.0'
     testImplementation platform('org.junit:junit-bom:5.9.1')
     testImplementation 'org.junit.jupiter:junit-jupiter'
 }

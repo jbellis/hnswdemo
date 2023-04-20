@@ -14,11 +14,11 @@ import java.util.stream.Collectors;
 public class SimpleExample {
     private static final VectorSimilarityFunction similarityFunction = VectorSimilarityFunction.COSINE;
     private static final Random random = new Random();
-    private static int universeSize = 10_000;
+    private static int universeSize = 50_000;
     private static int vectorDimensions = 1500;
 
     // search for the nearest neighbors of a random vector
-    private static int queryIterations = 1000;
+    private static int queryIterations = 10_000;
 
     static class LongItem implements Item<Long, float[]> {
         private final float[] vector;
@@ -47,7 +47,7 @@ public class SimpleExample {
 
     public static void main(String[] args) throws IOException {
         testLucene();
-//        testHnswlib();
+        testHnswlib();
     }
 
     private static void testHnswlib() {
@@ -55,17 +55,21 @@ public class SimpleExample {
         HnswIndex<Long, float[], LongItem, Float> hnsw = HnswIndex
                 .newBuilder(vectorDimensions, DistanceFunctions.FLOAT_INNER_PRODUCT, universeSize)
                 .withM(16)
-                .withEf(200)
-                .withEfConstruction(200)
+                .withEf(100)
+                .withEfConstruction(100)
                 .build();
         for (int i = 0; i < universeSize; i++) {
             hnsw.add(randomItem());
         }
 
-        for (int i = 0; i < queryIterations; i++) {
-            var v = randomVector(vectorDimensions);
-            hnsw.findNearest(v, 10);
-        }
+        System.out.println("Searching hnswlib graph...");
+        var searchTime = timeLambda(() -> {
+            for (int i = 0; i < queryIterations; i++) {
+                var v = randomVector(vectorDimensions);
+                hnsw.findNearest(v, 10);
+            }
+        });
+        System.out.println("Execution time: " + searchTime + "ms");
     }
 
     static LongItem randomItem() {
@@ -84,12 +88,25 @@ public class SimpleExample {
         var builder = HnswGraphBuilder.create(ravv, VectorEncoding.FLOAT32, similarityFunction, 16, 100, random.nextInt());
         var hnsw = builder.build(ravv.copy());
 
-        for (int i = 0; i < queryIterations; i++) {
-            var queryVector = randomVector(vectorDimensions);
+        System.out.println("Searching Lucene graph...");
+        var searchTime = timeLambda(() -> {
+            for (int i = 0; i < queryIterations; i++) {
+                var queryVector = randomVector(vectorDimensions);
+                try {
+                    luceneSearch(ravv, hnsw, queryVector, 10);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        });
+        System.out.println("Execution time: " + searchTime + "ms");
+    }
 
-//            bruteSearch(universe, queryVector, 10);
-            luceneSearch(ravv, hnsw, queryVector, 10);
-        }
+    public static int timeLambda(Runnable runnable) {
+        long startTime = System.nanoTime();
+        runnable.run();
+        long endTime = System.nanoTime();
+        return (int) ((endTime - startTime) / 1000_000);
     }
 
     private static void bruteSearch(float[][] universe, float[] queryVector, int topK) {
@@ -102,7 +119,7 @@ public class SimpleExample {
 
     private static void luceneSearch(MockVectorValues ravv, HnswGraph hnsw, float[] queryVector, int topK) throws IOException {
         NeighborQueue nn = HnswGraphSearcher.search(queryVector, topK, ravv, VectorEncoding.FLOAT32, similarityFunction, hnsw, null, Integer.MAX_VALUE);
-        System.out.println(nn.nodes().length + " found");
+//        System.out.println(nn.nodes().length + " found");
     }
 
      static float[] randomVector(int vectorDimension) {

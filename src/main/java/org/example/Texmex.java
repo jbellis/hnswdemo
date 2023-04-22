@@ -5,6 +5,7 @@ import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.util.hnsw.HnswGraphBuilder;
 import org.apache.lucene.util.hnsw.HnswGraphSearcher;
 import org.apache.lucene.util.hnsw.NeighborQueue;
+import org.example.util.ListRandomAccessVectorValues;
 
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
@@ -15,6 +16,7 @@ import java.nio.ByteOrder;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.DoubleAdder;
 import java.util.stream.IntStream;
 
 /**
@@ -92,12 +94,31 @@ public class Texmex {
     }
 
     public static void main(String[] args) throws IOException {
-        // average recall over 100 runs
-        var totalRecall = 0.0;
-        for (var i = 0; i < 100; i++) {
-            totalRecall += testRecall("siftsmall");
-        }
-        totalRecall /= 100;
-        System.out.println("Recall: " + totalRecall);
+        // Average recall and standard deviation over 100 runs
+        int numRuns = 100;
+
+        DoubleAdder totalRecall = new DoubleAdder();
+        DoubleAdder totalRecallSquared = new DoubleAdder();
+
+        IntStream.range(0, numRuns).parallel()
+                .mapToDouble(i -> {
+                    try {
+                        return testRecall("siftsmall");
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        return 0;
+                    }
+                })
+                .forEach(recall -> {
+                    totalRecall.add(recall);
+                    totalRecallSquared.add(recall * recall);
+                });
+
+        double averageRecall = totalRecall.doubleValue() / numRuns;
+        double variance = (totalRecallSquared.doubleValue() / numRuns) - (averageRecall * averageRecall);
+        double stdev = Math.sqrt(variance);
+
+        System.out.println("Average Recall: " + averageRecall);
+        System.out.println("Standard Deviation: " + stdev);
     }
 }

@@ -2,6 +2,7 @@ package org.example;
 
 import org.apache.lucene.index.*;
 import org.apache.lucene.util.hnsw.*;
+import org.example.util.ListRandomAccessVectorValues;
 
 import java.io.IOException;
 import java.util.ArrayList;

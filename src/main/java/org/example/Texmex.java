@@ -65,11 +65,7 @@ public class Texmex {
         return groundTruthTopK;
     }
 
-    public static double testRecall(String siftName) throws IOException {
-        var baseVectors = readFvecs(String.format("%s/%s_base.fvecs", siftName, siftName));
-        var queryVectors = readFvecs(String.format("%s/%s_query.fvecs", siftName, siftName));
-        var groundTruth = readIvecs(String.format("%s/%s_groundtruth.ivecs", siftName, siftName));
-
+    public static double testRecall(ArrayList<float[]> baseVectors, ArrayList<float[]> queryVectors, ArrayList<HashSet<Integer>> groundTruth) throws IOException {
         var ravv = new ListRandomAccessVectorValues(baseVectors, baseVectors.get(0).length);
         var builder = HnswGraphBuilder.create(ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.COSINE, 16, 100, ThreadLocalRandom.current().nextInt());
         var hnsw = builder.build(ravv.copy());
@@ -94,16 +90,22 @@ public class Texmex {
     }
 
     public static void main(String[] args) throws IOException {
-        // Average recall and standard deviation over 100 runs
-        int numRuns = 100;
+        // Read data files once
+        var siftName = "sift";
+        var baseVectors = readFvecs(String.format("%s/%s_base.fvecs", siftName, siftName));
+        var queryVectors = readFvecs(String.format("%s/%s_query.fvecs", siftName, siftName));
+        var groundTruth = readIvecs(String.format("%s/%s_groundtruth.ivecs", siftName, siftName));
 
-        DoubleAdder totalRecall = new DoubleAdder();
-        DoubleAdder totalRecallSquared = new DoubleAdder();
+        // Average recall and standard deviation over 100 runs
+        var numRuns = 10;
+
+        var totalRecall = new DoubleAdder();
+        var totalRecallSquared = new DoubleAdder();
 
         IntStream.range(0, numRuns).parallel()
                 .mapToDouble(i -> {
                     try {
-                        return testRecall("siftsmall");
+                        return testRecall(baseVectors, queryVectors, groundTruth);
                     } catch (IOException e) {
                         e.printStackTrace();
                         return 0;
@@ -114,9 +116,9 @@ public class Texmex {
                     totalRecallSquared.add(recall * recall);
                 });
 
-        double averageRecall = totalRecall.doubleValue() / numRuns;
-        double variance = (totalRecallSquared.doubleValue() / numRuns) - (averageRecall * averageRecall);
-        double stdev = Math.sqrt(variance);
+        var averageRecall = totalRecall.doubleValue() / numRuns;
+        var variance = (totalRecallSquared.doubleValue() / numRuns) - (averageRecall * averageRecall);
+        var stdev = Math.sqrt(variance);
 
         System.out.println("Average Recall: " + averageRecall);
         System.out.println("Standard Deviation: " + stdev);

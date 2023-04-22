@@ -23,25 +23,26 @@ public class SimpleExample {
     public static void main(String[] args) throws IOException {
         // Create a random vector universe
         var vectorDimensions = 1500;
-        var universeSize = 10_000;
+        var universeSize = 2_000;
         var universe = new ArrayList<float[]>(universeSize);
         for (var i = 0; i < universeSize; i++) {
             universe.add(randomVector(vectorDimensions));
         }
 
         // construct a HNSW graph of the universe
+        System.out.println("Constructing HNSW graph...");
         var ravv = new ListRandomAccessVectorValues(universe, vectorDimensions);
         var builder = HnswGraphBuilder.create(ravv, VectorEncoding.FLOAT32, similarityFunction, 16, 100, random.nextInt());
         var hnsw = builder.build(ravv.copy());
 
         // search for the nearest neighbors of a random vector
         var queryVector = randomVector(vectorDimensions);
+        System.out.println("Searching for top 10 neighbors of a random vector");
         var nn = HnswGraphSearcher.search(queryVector, 10, ravv.copy(), VectorEncoding.FLOAT32, similarityFunction, hnsw, null, Integer.MAX_VALUE);
-        System.out.println("Nearest neighbors of " + Arrays.toString(queryVector) + ":");
         for (var i : nn.nodes()) {
             var neighbor = universe.get(i);
             var similarity = similarityFunction.compare(queryVector, neighbor);
-            System.out.println("  " + Arrays.toString(neighbor) + " (similarity: " + similarity + ")");
+            System.out.printf("  ordinal %d (similarity: %s)%n", i, similarity);
         }
     }
 

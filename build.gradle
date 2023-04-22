@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'application'
 }
 
 group = 'org.example'
@@ -17,4 +18,17 @@ dependencies {
 
 test {
     useJUnitPlatform()
+}
+
+task runSimple(type: JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.example.SimpleExample'
+}
+
+task runTexmex(type: JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.example.Texmex'
+    if (project.hasProperty('siftName')) {
+        args siftName
+    }
 }

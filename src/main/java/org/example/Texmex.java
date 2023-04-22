@@ -20,15 +20,10 @@ import java.util.concurrent.atomic.DoubleAdder;
 import java.util.stream.IntStream;
 
 /**
- * Tests HNSW against vectors from the Texmex dataset: http://corpus-texmex.irisa.fr/
+ * Tests HNSW against vectors from the Texmex dataset
  */
 public class Texmex {
-    // this expects to find the files in a subdirectory of cwd as extracted from the dataset tgz archive:
-    // siftsmall, sift, etc.
-    //
-    // siftsmall runs in ~2 seconds (as long as there are enough cores to give each of the 10
-    // runs to a separate thread); sift runs in about 10.5 minutes.
-    private static final String siftName = "sift";
+    private static String siftName = "sift";
 
     public static ArrayList<float[]> readFvecs(String filePath) throws IOException {
         var vectors = new ArrayList<float[]>();
@@ -96,6 +91,10 @@ public class Texmex {
     }
 
     public static void main(String[] args) throws IOException {
+        if (args.length > 0) {
+            siftName = args[0];
+        }
+
         var baseVectors = readFvecs(String.format("%s/%s_base.fvecs", siftName, siftName));
         var queryVectors = readFvecs(String.format("%s/%s_query.fvecs", siftName, siftName));
         var groundTruth = readIvecs(String.format("%s/%s_groundtruth.ivecs", siftName, siftName));

@@ -23,6 +23,13 @@ import java.util.stream.IntStream;
  * Tests HNSW against vectors from the Texmex dataset: http://corpus-texmex.irisa.fr/
  */
 public class Texmex {
+    // this expects to find the files in a subdirectory of cwd as extracted from the dataset tgz archive:
+    // siftsmall, sift, etc.
+    //
+    // siftsmall runs in ~2 seconds (as long as there are enough cores to give each of the 10
+    // runs to a separate thread); sift runs in about 10.5 minutes.
+    private static final String siftName = "sift";
+
     public static ArrayList<float[]> readFvecs(String filePath) throws IOException {
         var vectors = new ArrayList<float[]>();
         try (var dis = new DataInputStream(new BufferedInputStream(new FileInputStream(filePath)))) {
@@ -76,7 +83,6 @@ public class Texmex {
             var queryVector = queryVectors.get(i);
             NeighborQueue nn;
             try {
-                // search is not threadsafe, not sure why
                 nn = HnswGraphSearcher.search(queryVector, 100, ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.COSINE, hnsw, null, Integer.MAX_VALUE);
             } catch (IOException e) {
                 throw new RuntimeException(e);
@@ -90,18 +96,18 @@ public class Texmex {
     }
 
     public static void main(String[] args) throws IOException {
-        // Read data files once
-        var siftName = "sift";
         var baseVectors = readFvecs(String.format("%s/%s_base.fvecs", siftName, siftName));
         var queryVectors = readFvecs(String.format("%s/%s_query.fvecs", siftName, siftName));
         var groundTruth = readIvecs(String.format("%s/%s_groundtruth.ivecs", siftName, siftName));
 
-        // Average recall and standard deviation over 100 runs
+        // Average recall and standard deviation over multiple runs
         var numRuns = 10;
 
         var totalRecall = new DoubleAdder();
         var totalRecallSquared = new DoubleAdder();
 
+        // searching against the same graph instance is not threadsafe, so parallelize
+        // by run instead of within runs.
         IntStream.range(0, numRuns).parallel()
                 .mapToDouble(i -> {
                     try {

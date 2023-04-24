@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.lucene.util.hnsw;
+package org.example.concurrent;
 
 import static org.apache.lucene.search.DocIdSetIterator.NO_MORE_DOCS;
 
@@ -24,12 +24,14 @@ import java.util.List;
 import java.util.TreeMap;
 import org.apache.lucene.util.Accountable;
 import org.apache.lucene.util.RamUsageEstimator;
+import org.apache.lucene.util.hnsw.HnswGraph;
+import org.apache.lucene.util.hnsw.NeighborArray;
 
 /**
  * An {@link HnswGraph} where all nodes and connections are held in memory. This class is used to
  * construct the HNSW graph before it's written to the index.
  */
-public final class OnHeapHnswGraph extends HnswGraph implements Accountable {
+public final class ConcurrentOnHeapHnswGraph extends HnswGraph implements Accountable {
 
     private int numLevels; // the current number of levels in the graph
     private int entryNode; // the current graph entry node on the top level. -1 if not set
@@ -53,7 +55,7 @@ public final class OnHeapHnswGraph extends HnswGraph implements Accountable {
     private int upto;
     private NeighborArray cur;
 
-    OnHeapHnswGraph(int M) {
+    ConcurrentOnHeapHnswGraph(int M) {
         this.numLevels = 1; // Implicitly start the graph with a single level
         this.graphLevel0 = new ArrayList<>();
         this.entryNode = -1; // Entry node should be negative until a node is added
@@ -131,7 +133,7 @@ public final class OnHeapHnswGraph extends HnswGraph implements Accountable {
     @Override
     public int nextNeighbor() {
         if (++upto < cur.size()) {
-            return cur.node[upto];
+            return cur.node()[upto];
         }
         return NO_MORE_DOCS;
     }
@@ -160,7 +162,7 @@ public final class OnHeapHnswGraph extends HnswGraph implements Accountable {
     @Override
     public NodesIterator getNodesOnLevel(int level) {
         if (level == 0) {
-            return new ArrayNodesIterator(size());
+            return new HnswGraph.ArrayNodesIterator(size());
         } else {
             return new CollectionNodesIterator(graphUpperLevels.get(level).keySet());
         }

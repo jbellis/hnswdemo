@@ -24,7 +24,7 @@ import java.util.stream.IntStream;
  * Tests HNSW against vectors from the Texmex dataset
  */
 public class Texmex {
-    private static String siftName = "sift";
+    private static String siftName = "siftsmall";
 
     public static ArrayList<float[]> readFvecs(String filePath) throws IOException {
         var vectors = new ArrayList<float[]>();
@@ -106,15 +106,18 @@ public class Texmex {
         var totalRecall = new DoubleAdder();
         var totalRecallSquared = new DoubleAdder();
 
-        // searching against the same graph instance is not threadsafe, so parallelize
-        // by run instead of within runs.
         IntStream.range(0, numRuns)
                 .mapToDouble(i -> {
+                    var start = System.nanoTime();
                     try {
                         return testRecall(baseVectors, queryVectors, groundTruth);
                     } catch (IOException e) {
                         e.printStackTrace();
                         return 0;
+                    }
+                    finally {
+                        var end = System.nanoTime();
+                        System.out.println("Run " + i + " took " + (end - start) / 1_000_000_000.0 + " seconds");
                     }
                 })
                 .forEach(recall -> {

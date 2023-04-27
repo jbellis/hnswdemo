@@ -14,4 +14,4 @@ $ ./gradlew runTexmex -PsiftName=siftsmall
 ```
 
 The Texmex datasets may be found [here](http://corpus-texmex.irisa.fr/). 
-The Texmex class expects to find the data files in a subdirectory of the current working directory, as extracted from the dataset `tgz` archive (e.g. `siftsmall`, `sift`, etc.). The `siftsmall` dataset runs in about 2 seconds, as long as there are enough cores to give each of the 10 runs to a separate thread. The `sift` dataset runs in about 10.5 minutes.
+The Texmex class expects to find the data files in a subdirectory of the current working directory, as extracted from the dataset `tgz` archive (e.g. `siftsmall`, `sift`, etc.). The `siftsmall` dataset runs in about 2 seconds. The `sift` dataset runs in about 10.5 minutes.

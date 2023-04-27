@@ -2,7 +2,6 @@ package org.example;
 
 import org.apache.lucene.index.VectorEncoding;
 import org.apache.lucene.index.VectorSimilarityFunction;
-import org.apache.lucene.util.hnsw.ConcurrentHnswGraphBuilder;
 import org.apache.lucene.util.hnsw.HnswGraphBuilder;
 import org.apache.lucene.util.hnsw.HnswGraphSearcher;
 import org.apache.lucene.util.hnsw.NeighborQueue;
@@ -24,7 +23,7 @@ import java.util.stream.IntStream;
  * Tests HNSW against vectors from the Texmex dataset
  */
 public class Texmex {
-    private static String siftName = "siftsmall";
+    private static String siftName = "sift";
 
     public static ArrayList<float[]> readFvecs(String filePath) throws IOException {
         var vectors = new ArrayList<float[]>();
@@ -99,9 +98,11 @@ public class Texmex {
         var baseVectors = readFvecs(String.format("%s/%s_base.fvecs", siftName, siftName));
         var queryVectors = readFvecs(String.format("%s/%s_query.fvecs", siftName, siftName));
         var groundTruth = readIvecs(String.format("%s/%s_groundtruth.ivecs", siftName, siftName));
+        System.out.format("%d base and %d query vectors loaded, dimensions %d%n",
+                baseVectors.size(), queryVectors.size(), baseVectors.get(0).length);
 
         // Average recall and standard deviation over multiple runs
-        var numRuns = 10;
+        var numRuns = 5;
 
         var totalRecall = new DoubleAdder();
         var totalRecallSquared = new DoubleAdder();

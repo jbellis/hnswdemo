@@ -2,6 +2,7 @@ package org.example;
 
 import org.apache.lucene.index.VectorEncoding;
 import org.apache.lucene.index.VectorSimilarityFunction;
+import org.apache.lucene.util.hnsw.ConcurrentHnswGraphBuilder;
 import org.apache.lucene.util.hnsw.HnswGraphBuilder;
 import org.apache.lucene.util.hnsw.HnswGraphSearcher;
 import org.apache.lucene.util.hnsw.NeighborQueue;
@@ -69,12 +70,12 @@ public class Texmex {
 
     public static double testRecall(ArrayList<float[]> baseVectors, ArrayList<float[]> queryVectors, ArrayList<HashSet<Integer>> groundTruth) throws IOException {
         var ravv = new ListRandomAccessVectorValues(baseVectors, baseVectors.get(0).length);
-        var builder = HnswGraphBuilder.create(ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.COSINE, 16, 100, ThreadLocalRandom.current().nextInt());
+        var builder = ConcurrentHnswGraphBuilder.create(ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.COSINE, 16, 100, ThreadLocalRandom.current().nextInt());
         var hnsw = builder.build(ravv.copy());
 
         var topKfound = new AtomicInteger(0);
         var topK = 100;
-        IntStream.range(0, queryVectors.size()).forEach(i -> {
+        IntStream.range(0, queryVectors.size()).parallel().forEach(i -> {
             var queryVector = queryVectors.get(i);
             NeighborQueue nn;
             try {
@@ -107,7 +108,7 @@ public class Texmex {
 
         // searching against the same graph instance is not threadsafe, so parallelize
         // by run instead of within runs.
-        IntStream.range(0, numRuns).parallel()
+        IntStream.range(0, numRuns)
                 .mapToDouble(i -> {
                     try {
                         return testRecall(baseVectors, queryVectors, groundTruth);

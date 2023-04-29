@@ -74,19 +74,19 @@ public class Texmex {
 
         var topKfound = new AtomicInteger(0);
         var topK = 100;
-        IntStream.range(0, queryVectors.size()).forEach(i -> {
-            var queryVector = queryVectors.get(i);
-            NeighborQueue nn;
-            try {
-                nn = HnswGraphSearcher.search(queryVector, 100, ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.COSINE, hnsw, null, Integer.MAX_VALUE);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-
-            var gt = groundTruth.get(i);
-            var n = IntStream.range(0, topK).filter(j -> gt.contains(nn.nodes()[j])).count();
-            topKfound.addAndGet((int) n);
-        });
+//        IntStream.range(0, queryVectors.size()).forEach(i -> {
+//            var queryVector = queryVectors.get(i);
+//            NeighborQueue nn;
+//            try {
+//                nn = HnswGraphSearcher.search(queryVector, 100, ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.COSINE, hnsw, null, Integer.MAX_VALUE);
+//            } catch (IOException e) {
+//                throw new RuntimeException(e);
+//            }
+//
+//            var gt = groundTruth.get(i);
+//            var n = IntStream.range(0, topK).filter(j -> gt.contains(nn.nodes()[j])).count();
+//            topKfound.addAndGet((int) n);
+//        });
         return (double) topKfound.get() / (queryVectors.size() * topK);
     }
 

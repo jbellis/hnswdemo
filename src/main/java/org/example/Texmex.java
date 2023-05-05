@@ -70,7 +70,7 @@ public class Texmex {
 
     public static double testRecall(ArrayList<float[]> baseVectors, ArrayList<float[]> queryVectors, ArrayList<HashSet<Integer>> groundTruth) throws IOException {
         var ravv = new ListRandomAccessVectorValues(baseVectors, baseVectors.get(0).length);
-        var builder = ConcurrentHnswGraphBuilder.create(ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.COSINE, 16, 100, false);
+        var builder = ConcurrentHnswGraphBuilder.create(ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.COSINE, 16, 100);
         var hnsw = builder.build(ravv.copy());
 
         var topKfound = new AtomicInteger(0);
@@ -103,12 +103,12 @@ public class Texmex {
                 baseVectors.size(), queryVectors.size(), baseVectors.get(0).length);
 
         // Average recall and standard deviation over multiple runs
-        var numRuns = 1;
+        var numRuns = 5;
 
         var totalRecall = new DoubleAdder();
         var totalRecallSquared = new DoubleAdder();
 
-        IntStream.range(0, numRuns).parallel()
+        IntStream.range(0, numRuns)
                 .mapToDouble(i -> {
                     var start = System.nanoTime();
                     try {

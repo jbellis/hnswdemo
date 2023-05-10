@@ -90,6 +90,8 @@ public class Texmex {
         return (double) topKfound.get() / (queryVectors.size() * topK);
     }
 
+    record RecallAndTime(double recall, double time) {}
+
     public static void main(String[] args) throws IOException {
         if (args.length > 0) {
             siftName = args[0];
@@ -102,28 +104,28 @@ public class Texmex {
                 baseVectors.size(), queryVectors.size(), baseVectors.get(0).length);
 
         // Average recall and standard deviation over multiple runs
-        var numRuns = 5;
-
+        var numRuns = 30;
         var totalRecall = new DoubleAdder();
         var totalRecallSquared = new DoubleAdder();
 
         IntStream.range(0, numRuns).parallel()
-                .mapToDouble(i -> {
+                .mapToObj(i -> {
                     var start = System.nanoTime();
+                    double recall;
                     try {
-                        return testRecall(baseVectors, queryVectors, groundTruth);
+                        recall = testRecall(baseVectors, queryVectors, groundTruth);
                     } catch (IOException e) {
-                        e.printStackTrace();
-                        return 0;
+                        throw new RuntimeException(e);
+                    } finally {
                     }
-                    finally {
-                        var end = System.nanoTime();
-                        System.out.println("Run " + i + " took " + (end - start) / 1_000_000_000.0 + " seconds");
-                    }
+                    var end = System.nanoTime();
+                    var time = (end - start) / 1_000_000_000.0;
+                    return new RecallAndTime(recall, time);
                 })
-                .forEach(recall -> {
-                    totalRecall.add(recall);
-                    totalRecallSquared.add(recall * recall);
+                .forEach(recallAndTime -> {
+                    totalRecall.add(recallAndTime.recall());
+                    totalRecallSquared.add(recallAndTime.recall() * recallAndTime.recall());
+                    System.out.println("Recall: " + recallAndTime.recall() + ", Time: " + recallAndTime.time());
                 });
 
         var averageRecall = totalRecall.doubleValue() / numRuns;

@@ -6,24 +6,27 @@ from typing import List, Set
 import concurrent.futures
 
 
-def read_fvecs(filepath: str) -> List[List[float]]:
+def read_fvecs(filepath: str) -> np.ndarray:
     vectors = []
     with open(filepath, 'rb') as file:
         while True:
             try:
-                dimension = unpack('i', file.read(4))[0]
+                dimension = np.fromfile(file, dtype=np.int32, count=1)[0]
                 assert dimension > 0, dimension
-                vector = unpack('f' * dimension, file.read(4 * dimension))
-                vectors.append(list(vector))
+                vector = np.fromfile(file, dtype=np.float32, count=dimension)
+                vectors.append(vector)
             except:
                 break
-    return vectors
+    return np.array(vectors)
 
 def insert_vectors(db, base_vectors):
     from concurrent.futures import ThreadPoolExecutor
     from tqdm import tqdm
     with ThreadPoolExecutor() as executor:
-        list(tqdm(executor.map(db.upsert_one, range(len(base_vectors)), base_vectors), total=len(base_vectors)))
+        list(tqdm(executor.map(db.upsert_one, 
+                               range(len(base_vectors)), 
+                               base_vectors), 
+                  total=len(base_vectors)))
 
 def load(sift_name):
     import db

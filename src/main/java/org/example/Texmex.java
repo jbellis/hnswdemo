@@ -102,7 +102,7 @@ public class Texmex {
                 baseVectors.size(), queryVectors.size(), baseVectors.get(0).length);
 
         // Average recall and standard deviation over multiple runs
-        var numRuns = 5;
+        var numRuns = 8;
 
         var totalRecall = new DoubleAdder();
         var totalRecallSquared = new DoubleAdder();

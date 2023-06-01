@@ -1,7 +1,7 @@
 from typing import Any, Dict, List
 from cassandra.cluster import Cluster
 from cassandra.query import SimpleStatement
-
+from cassandra.protocol import SyntaxException
 
 class DB:
     def __init__(self, keyspace: str, table: str, **kwargs):
@@ -48,9 +48,9 @@ class DB:
 
     def query(self, vector: List[float], top_k: int) -> List[str]:
         query = SimpleStatement(
-            f"SELECT pk, val FROM {self.keyspace}.{self.table} ORDER BY val ANN OF %s LIMIT %s"
+            f"SELECT pk FROM {self.keyspace}.{self.table} ORDER BY val ANN OF %s LIMIT %s"
         )
         res = self.session.execute(query, (vector, top_k))
         rows = [row for row in res]
-        # print('\n'.join(repr(row) for row in rows))
-        return [row.text for row in rows]
+        print('\n'.join(repr(row) for row in rows))
+        return [row.pk for row in rows]

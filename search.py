@@ -8,18 +8,21 @@ import numpy as np
 from tqdm import tqdm
 
 from load import read_fvecs
-from db import DB, SyntaxException
+from db import DB
 
 
 def read_ivecs(filename: str) -> List[Set[int]]:
     ground_truth_top_k = []
-    fsize = os.path.getsize(filename)
     with open(filename, 'rb') as file:
-        while file.tell() < fsize:
-            num_neighbors = unpack('i', file.read(4))[0]
-            neighbors = set(unpack('i' * num_neighbors, file.read(4 * num_neighbors)))
-            ground_truth_top_k.append(neighbors)
+        while True:
+            try:
+                num_neighbors = np.fromfile(file, dtype=np.int32, count=1)[0]
+                neighbors = np.fromfile(file, dtype=np.int32, count=num_neighbors)
+                ground_truth_top_k.append(set(neighbors))
+            except:
+                break
     return ground_truth_top_k
+
 
 def test_recall(db, query_vectors, ground_truth):
     top_k_found = 0
@@ -27,12 +30,8 @@ def test_recall(db, query_vectors, ground_truth):
     num_query_vectors = len(query_vectors)
 
     def perform_query_and_count(query_vector, gt):
-        try:
-            result = db.query(query_vector, top_k)
-        except SyntaxException:
-            return 0
-        print('good!')
-        n = sum(1 for row in result if row["pk"] in gt)
+        result = db.query(query_vector.tolist(), top_k)
+        n = sum(1 for pk in result if pk in gt)
         return n
 
     with ThreadPoolExecutor() as executor:

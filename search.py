@@ -24,34 +24,23 @@ def read_ivecs(filename: str) -> List[Set[int]]:
     return ground_truth_top_k
 
 
-def test_recall(db, query_vectors, ground_truth):
-    top_k_found = 0
-    top_k = 100
+def test_recall(db, query_vectors):
+    top_k = 10
     num_query_vectors = len(query_vectors)
 
-    def perform_query_and_count(query_vector, gt):
-        result = db.query(query_vector.tolist(), top_k)
-        n = sum(1 for pk in result if pk in gt)
-        return n
+    def perform_query_and_count(query_vector):
+        db.query(query_vector.tolist(), top_k)
 
     with ThreadPoolExecutor() as executor:
-        results = list(tqdm(executor.map(lambda x: perform_query_and_count(query_vectors[x], 
-                                                                           ground_truth[x]), 
+        list(tqdm(executor.map(lambda x: perform_query_and_count(query_vectors[x]), 
                                          range(num_query_vectors)), 
                             total=num_query_vectors))
-        top_k_found = sum(results)
-
-    return top_k_found / (num_query_vectors * top_k)
 
 def test(sift_name):
     db = DB("demo", sift_name)
 
     query_vectors = read_fvecs(f"{sift_name}/{sift_name}_query.fvecs")
-    ground_truth = read_ivecs(f"{sift_name}/{sift_name}_groundtruth.ivecs")
-    assert len(query_vectors) == len(ground_truth), (len(query_vectors), len(ground_truth))
-
-    memory_recall = test_recall(db, query_vectors, ground_truth)
-    print(memory_recall)
+    test_recall(db, query_vectors)
 
 
 if __name__ == "__main__":

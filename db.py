@@ -22,7 +22,8 @@ class DB:
             f"""
             CREATE TABLE IF NOT EXISTS {keyspace}.{table} (
             pk int PRIMARY KEY,
-            val vector<float, 128>);
+            val vector<float, 128>)
+            WITH compression = {{ 'enabled' : false }}
             """
         )
 

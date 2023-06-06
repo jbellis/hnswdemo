@@ -1,37 +1,44 @@
+import os
 import sys
+import cProfile, pstats
+
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
-from struct import unpack
-from typing import List, Set
-import concurrent.futures
+from tqdm import tqdm
 
+from db import DB
+
+
+def count_vectors(filepath):
+    with open(filepath, 'rb') as file:
+        dimension = np.fromfile(file, dtype=np.int32, count=1)[0]
+        assert dimension > 0, dimension
+        file_size = os.path.getsize(filepath)
+        return file_size // (4 + dimension * 4)
 
 def read_fvecs(filepath: str) -> np.ndarray:
     vectors = []
+    n = count_vectors(filepath)
     with open(filepath, 'rb') as file:
-        while True:
-            try:
-                dimension = np.fromfile(file, dtype=np.int32, count=1)[0]
-                assert dimension > 0, dimension
-                vector = np.fromfile(file, dtype=np.float32, count=dimension)
-                vectors.append(vector)
-            except:
-                break
-    return np.array(vectors)
+        for i in tqdm(range(n), desc='Reading vectors'):
+            dimension = np.fromfile(file, dtype=np.int32, count=1)[0]
+            assert dimension > 0, dimension
+            vector = np.fromfile(file, dtype=np.float32, count=dimension)
+            vectors.append(vector)
+    return vectors
 
 def insert_vectors(db, base_vectors):
-    from concurrent.futures import ThreadPoolExecutor
-    from tqdm import tqdm
     with ThreadPoolExecutor() as executor:
-        list(tqdm(executor.map(db.upsert_one, 
+        results = executor.map(lambda i, x: db.upsert_one(i, x.tolist()), 
                                range(len(base_vectors)), 
-                               base_vectors), 
-                  total=len(base_vectors)))
+                               base_vectors)
+        for _ in tqdm(results, total=len(base_vectors), desc='Inserting vectors'):
+            pass
 
 def load(sift_name):
-    import db
-    db = db.DB("demo", sift_name)
     base_vectors = read_fvecs(f"{sift_name}/{sift_name}_base.fvecs")
+    db = DB("demo", sift_name)
     insert_vectors(db, base_vectors)
 
 

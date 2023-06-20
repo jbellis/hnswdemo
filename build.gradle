@@ -32,4 +32,5 @@ task runTexmex(type: JavaExec) {
     if (project.hasProperty('siftName')) {
         args siftName
     }
+    jvmArgs '-XX:+FlightRecorder', '-XX:StartFlightRecording:filename=flight.jfr'
 }

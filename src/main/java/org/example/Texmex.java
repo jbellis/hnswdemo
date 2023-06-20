@@ -69,24 +69,31 @@ public class Texmex {
 
     public static double testRecall(ArrayList<float[]> baseVectors, ArrayList<float[]> queryVectors, ArrayList<HashSet<Integer>> groundTruth) throws IOException {
         var ravv = new ListRandomAccessVectorValues(baseVectors, baseVectors.get(0).length);
+
+        var start = System.nanoTime();
         var builder = HnswGraphBuilder.create(ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.COSINE, 16, 100, ThreadLocalRandom.current().nextInt());
         var hnsw = builder.build(ravv.copy());
+        var end = System.nanoTime();
+        System.out.printf("  Building index took %s seconds%n", (end - start) / 1_000_000_000.0);
 
         var topKfound = new AtomicInteger(0);
         var topK = 100;
-//        IntStream.range(0, queryVectors.size()).forEach(i -> {
-//            var queryVector = queryVectors.get(i);
-//            NeighborQueue nn;
-//            try {
-//                nn = HnswGraphSearcher.search(queryVector, 100, ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.COSINE, hnsw, null, Integer.MAX_VALUE);
-//            } catch (IOException e) {
-//                throw new RuntimeException(e);
-//            }
-//
-//            var gt = groundTruth.get(i);
-//            var n = IntStream.range(0, topK).filter(j -> gt.contains(nn.nodes()[j])).count();
-//            topKfound.addAndGet((int) n);
-//        });
+        start = System.nanoTime();
+        IntStream.range(0, queryVectors.size()).forEach(i -> {
+            var queryVector = queryVectors.get(i);
+            NeighborQueue nn;
+            try {
+                nn = HnswGraphSearcher.search(queryVector, 100, ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.COSINE, hnsw, null, Integer.MAX_VALUE);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+
+            var gt = groundTruth.get(i);
+            var n = IntStream.range(0, topK).filter(j -> gt.contains(nn.nodes()[j])).count();
+            topKfound.addAndGet((int) n);
+        });
+        System.out.printf("  Querying %d vectors took %s seconds%n", queryVectors.size(), (end - start) / 1_000_000_000.0);
+
         return (double) topKfound.get() / (queryVectors.size() * topK);
     }
 
@@ -109,16 +116,12 @@ public class Texmex {
 
         IntStream.range(0, numRuns).parallel()
                 .mapToDouble(i -> {
-                    var start = System.nanoTime();
+                    System.out.printf("Run %d:%n", i);
                     try {
                         return testRecall(baseVectors, queryVectors, groundTruth);
                     } catch (IOException e) {
                         e.printStackTrace();
                         return 0;
-                    }
-                    finally {
-                        var end = System.nanoTime();
-                        System.out.println("Run " + i + " took " + (end - start) / 1_000_000_000.0 + " seconds");
                     }
                 })
                 .forEach(recall -> {

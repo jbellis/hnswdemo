@@ -32,4 +32,6 @@ task runTexmex(type: JavaExec) {
     if (project.hasProperty('siftName')) {
         args siftName
     }
+    jvmArgs '--add-modules=jdk.incubator.vector'
+    // jvmArgs '-XX:+FlightRecorder', '-XX:StartFlightRecording:filename=flight.jfr'
 }

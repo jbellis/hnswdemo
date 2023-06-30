@@ -84,7 +84,7 @@ public class Texmex {
                 var queryVector = queryVectors.get(i);
                 NeighborQueue nn;
                 try {
-                    nn = HnswGraphSearcher.search(queryVector, 100, ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.COSINE, hnsw, null, Integer.MAX_VALUE);
+                    nn = HnswGraphSearcher.search(queryVector, 100, ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.COSINE, hnsw.getView(), null, Integer.MAX_VALUE);
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }

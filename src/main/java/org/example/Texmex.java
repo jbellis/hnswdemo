@@ -74,26 +74,27 @@ public class Texmex {
         var start = System.nanoTime();
         var builder = ConcurrentHnswGraphBuilder.create(ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.COSINE, 16, 100);
         var hnsw = builder.build(ravv.copy());
-        var end = System.nanoTime();
-        System.out.printf("  Building index took %s seconds%n", (end - start) / 1_000_000_000.0);
+        System.out.printf("  Building index took %s seconds%n", (System.nanoTime() - start) / 1_000_000_000.0);
 
         var topKfound = new AtomicInteger(0);
         var topK = 100;
         start = System.nanoTime();
-        IntStream.range(0, queryVectors.size()).parallel().forEach(i -> {
-            var queryVector = queryVectors.get(i);
-            NeighborQueue nn;
-            try {
-                nn = HnswGraphSearcher.search(queryVector, 100, ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.COSINE, hnsw, null, Integer.MAX_VALUE);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
+        for (int k = 0; k < 10; k++) {
+            IntStream.range(0, queryVectors.size()).parallel().forEach(i -> {
+                var queryVector = queryVectors.get(i);
+                NeighborQueue nn;
+                try {
+                    nn = HnswGraphSearcher.search(queryVector, 100, ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.COSINE, hnsw, null, Integer.MAX_VALUE);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
 
-            var gt = groundTruth.get(i);
-            var n = IntStream.range(0, topK).filter(j -> gt.contains(nn.nodes()[j])).count();
-            topKfound.addAndGet((int) n);
-        });
-        System.out.printf("  Querying %d vectors took %s seconds%n", queryVectors.size(), (end - start) / 1_000_000_000.0);
+                var gt = groundTruth.get(i);
+                var n = IntStream.range(0, topK).filter(j -> gt.contains(nn.nodes()[j])).count();
+                topKfound.addAndGet((int) n);
+            });
+        }
+        System.out.printf("  Querying %d vectors took %s seconds%n", queryVectors.size(), (System.nanoTime() - start) / 1_000_000_000.0);
         return (double) topKfound.get() / (queryVectors.size() * topK);
     }
 

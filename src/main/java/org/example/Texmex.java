@@ -2,8 +2,8 @@ package org.example;
 
 import org.apache.lucene.index.VectorEncoding;
 import org.apache.lucene.index.VectorSimilarityFunction;
+import org.apache.lucene.util.NamedThreadFactory;
 import org.apache.lucene.util.hnsw.ConcurrentHnswGraphBuilder;
-import org.apache.lucene.util.hnsw.HnswGraphBuilder;
 import org.apache.lucene.util.hnsw.HnswGraphSearcher;
 import org.apache.lucene.util.hnsw.NeighborQueue;
 import org.example.util.ListRandomAccessVectorValues;
@@ -14,8 +14,10 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.*;
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.DoubleAdder;
 import java.util.stream.IntStream;
@@ -68,12 +70,15 @@ public class Texmex {
         return groundTruthTopK;
     }
 
-    public static double testRecall(ArrayList<float[]> baseVectors, ArrayList<float[]> queryVectors, ArrayList<HashSet<Integer>> groundTruth) throws IOException {
+    public static double testRecall(ArrayList<float[]> baseVectors, ArrayList<float[]> queryVectors, ArrayList<HashSet<Integer>> groundTruth) throws IOException, InterruptedException, ExecutionException {
         var ravv = new ListRandomAccessVectorValues(baseVectors, baseVectors.get(0).length);
 
         var start = System.nanoTime();
         var builder = ConcurrentHnswGraphBuilder.create(ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.COSINE, 16, 100);
-        var hnsw = builder.build(ravv.copy());
+        int buildThreads = 8;
+        var es = Executors.newFixedThreadPool(
+                        buildThreads, new NamedThreadFactory("Concurrent HNSW builder"));
+        var hnsw = builder.buildAsync(ravv.copy(), es, buildThreads).get();
         System.out.printf("  Building index took %s seconds%n", (System.nanoTime() - start) / 1_000_000_000.0);
 
         var topKfound = new AtomicInteger(0);
@@ -94,7 +99,7 @@ public class Texmex {
                 topKfound.addAndGet((int) n);
             });
         }
-        System.out.printf("  Querying %d vectors took %s seconds%n", queryVectors.size(), (System.nanoTime() - start) / 1_000_000_000.0);
+        System.out.printf("  Querying %d vectors x10 in parallel took %s seconds%n", queryVectors.size(), (System.nanoTime() - start) / 1_000_000_000.0);
         return (double) topKfound.get() / (queryVectors.size() * topK);
     }
 
@@ -120,7 +125,7 @@ public class Texmex {
                     System.out.printf("Run %d:%n", i);
                     try {
                         return testRecall(baseVectors, queryVectors, groundTruth);
-                    } catch (IOException e) {
+                    } catch (Exception e) {
                         e.printStackTrace();
                         return 0;
                     }

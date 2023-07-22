@@ -78,7 +78,8 @@ public class Texmex {
         var topKfound = new AtomicInteger(0);
         var topK = 100;
         start = System.nanoTime();
-        for (int k = 0; k < 10; k++) {
+        int queryRuns = 10;
+        for (int k = 0; k < queryRuns; k++) {
             IntStream.range(0, queryVectors.size()).forEach(i -> {
                 var queryVector = queryVectors.get(i);
                 NeighborQueue nn;
@@ -95,7 +96,7 @@ public class Texmex {
         }
         System.out.printf("  Querying %d vectors x10 took %s seconds%n", queryVectors.size(), (System.nanoTime() - start) / 1_000_000_000.0);
 
-        return (double) topKfound.get() / (queryVectors.size() * topK);
+        return (double) topKfound.get() / (queryRuns * queryVectors.size() * topK);
     }
 
     public static void main(String[] args) throws IOException {

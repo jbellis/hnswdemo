@@ -3,9 +3,8 @@ package org.example;
 import org.apache.lucene.index.VectorEncoding;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.util.NamedThreadFactory;
-import org.apache.lucene.util.hnsw.ConcurrentHnswGraphBuilder;
-import org.apache.lucene.util.hnsw.HnswGraphSearcher;
-import org.apache.lucene.util.hnsw.NeighborQueue;
+import org.apache.lucene.util.VectorUtil;
+import org.apache.lucene.util.hnsw.*;
 import org.example.util.ListRandomAccessVectorValues;
 
 import java.io.BufferedInputStream;
@@ -42,6 +41,7 @@ public class Texmex {
                 for (var i = 0; i < dimension; i++) {
                     vector[i] = byteBuffer.getFloat();
                 }
+                VectorUtil.l2normalize(vector);
                 vectors.add(vector);
             }
         }
@@ -74,33 +74,51 @@ public class Texmex {
         var ravv = new ListRandomAccessVectorValues(baseVectors, baseVectors.get(0).length);
 
         var start = System.nanoTime();
-        var builder = ConcurrentHnswGraphBuilder.create(ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.COSINE, 16, 100);
-        int buildThreads = 8;
+        var builder = ConcurrentHnswGraphBuilder.create(ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.DOT_PRODUCT, 16, 100);
+        int buildThreads = 24;
         var es = Executors.newFixedThreadPool(
                         buildThreads, new NamedThreadFactory("Concurrent HNSW builder"));
         var hnsw = builder.buildAsync(ravv.copy(), es, buildThreads).get();
+        es.shutdown();
         System.out.printf("  Building index took %s seconds%n", (System.nanoTime() - start) / 1_000_000_000.0);
+
+        start = System.nanoTime();
+        FingerMetadata<float[]> fm = new FingerMetadata<>(hnsw.getView(), ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.DOT_PRODUCT, 64);
+        System.out.printf("  Finger metadata created in %s seconds%n", (System.nanoTime() - start) / 1_000_000_000.0);
 
         var topKfound = new AtomicInteger(0);
         var topK = 100;
         start = System.nanoTime();
-        for (int k = 0; k < 10; k++) {
+
+        int queryRuns = 100;
+        performQueries(queryVectors, groundTruth, ravv, hnsw, fm, topKfound, topK, queryRuns);
+        System.out.printf("  Querying %d vectors x10 in parallel took %s seconds%n", queryVectors.size(), (System.nanoTime() - start) / 1_000_000_000.0);
+        return (double) topKfound.get() / (queryRuns * queryVectors.size() * topK);
+    }
+
+    private static void performQueries(ArrayList<float[]> queryVectors, ArrayList<HashSet<Integer>> groundTruth, ListRandomAccessVectorValues ravv, ConcurrentOnHeapHnswGraph hnsw, FingerMetadata<float[]> fm, AtomicInteger topKfound, int topK, int queryRuns) {
+        for (int k = 0; k < queryRuns; k++) {
+            ThreadLocal<HnswSearcher<float[]>> searchers = ThreadLocal.withInitial(() -> {
+                return new HnswSearcher.Builder<>(hnsw.getView(), ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.DOT_PRODUCT)
+                        .withFinger(fm)
+                        .build();
+            });
             IntStream.range(0, queryVectors.size()).parallel().forEach(i -> {
                 var queryVector = queryVectors.get(i);
                 NeighborQueue nn;
                 try {
-                    nn = HnswGraphSearcher.search(queryVector, 100, ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.COSINE, hnsw.getView(), null, Integer.MAX_VALUE);
+                    var searcher = searchers.get();
+                    nn = searcher.search(queryVector, topK, null, Integer.MAX_VALUE);
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
 
                 var gt = groundTruth.get(i);
-                var n = IntStream.range(0, topK).filter(j -> gt.contains(nn.nodes()[j])).count();
+                int[] resultNodes = nn.nodes();
+                var n = IntStream.range(0, Math.min(nn.size(), topK)).filter(j -> gt.contains(resultNodes[j])).count();
                 topKfound.addAndGet((int) n);
             });
         }
-        System.out.printf("  Querying %d vectors x10 in parallel took %s seconds%n", queryVectors.size(), (System.nanoTime() - start) / 1_000_000_000.0);
-        return (double) topKfound.get() / (queryVectors.size() * topK);
     }
 
     public static void main(String[] args) throws IOException {
@@ -108,6 +126,7 @@ public class Texmex {
             siftName = args[0];
         }
 
+        System.out.println("Heap space available is " + Runtime.getRuntime().maxMemory());
         var baseVectors = readFvecs(String.format("%s/%s_base.fvecs", siftName, siftName));
         var queryVectors = readFvecs(String.format("%s/%s_query.fvecs", siftName, siftName));
         var groundTruth = readIvecs(String.format("%s/%s_groundtruth.ivecs", siftName, siftName));
@@ -115,7 +134,7 @@ public class Texmex {
                 baseVectors.size(), queryVectors.size(), baseVectors.get(0).length);
 
         // Average recall and standard deviation over multiple runs
-        var numRuns = 5;
+        var numRuns = 1;
 
         var totalRecall = new DoubleAdder();
         var totalRecallSquared = new DoubleAdder();

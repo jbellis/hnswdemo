@@ -28,7 +28,7 @@ public class Texmex {
         var topK = groundTruth.get(0).size();
 
         var start = System.nanoTime();
-        var builder = HnswGraphBuilder.create(ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.DOT_PRODUCT, 16, 100, 42);
+        var builder = HnswGraphBuilder.create(ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.COSINE, 16, 100, 42);
         var hnsw = builder.build(ravv.copy());
         long buildNanos = System.nanoTime() - start;
 
@@ -56,7 +56,7 @@ public class Texmex {
     private static int performQueries(List<float[]> queryVectors, List<Set<Integer>> groundTruth, ListRandomAccessVectorValues ravv, HnswGraph hnsw, FingerMetadata<float[]> fm, int topK, int queryRuns) throws IOException {
         int topKfound = 0;
         for (int k = 0; k < queryRuns; k++) {
-            HnswSearcher<float[]> searcher = new HnswSearcher.Builder<>(hnsw, ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.DOT_PRODUCT)
+            HnswSearcher<float[]> searcher = new HnswSearcher.Builder<>(hnsw, ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.COSINE)
                         .withFinger(fm)
                         .build();
             for (int i = 0; i < queryVectors.size(); i++) {
@@ -83,33 +83,7 @@ public class Texmex {
         List<float[]> scrubbedBaseVectors = new ArrayList<>(baseVectors.length);
         List<float[]> scrubbedQueryVectors = new ArrayList<>(queryVectors.length);
         List<Set<Integer>> gtSet = new ArrayList<>(groundTruth.length);
-        if (Math.abs(normOf(baseVectors[0]) - 1.0) > 1e-5) {
-            System.out.println("Normalizing vectors for " + pathStr);
-            for (float[] v : baseVectors) {
-                try {
-                    VectorUtil.l2normalize(v);
-                    scrubbedBaseVectors.add(v);
-                } catch (Throwable th) {
-                    // System.out.println("Skipping vector with norm " + normOf(v));
-                }
-            }
-            for (int i = 0; i < queryVectors.length; i++) {
-                float[] v = queryVectors[i];
-                try {
-                    // do it in this order so if the normalize fails for being length 0,
-                    // we don't add it to the query or ground truth sets
-                    VectorUtil.l2normalize(v);
-                    scrubbedQueryVectors.add(v);
-                    var gt = new HashSet<Integer>();
-                    for (int j = 0; j < groundTruth[i].length; j++) {
-                        gt.add(groundTruth[i][j]);
-                    }
-                    gtSet.add(gt);
-                } catch (Throwable th) {
-                    // System.out.println("Skipping vector with norm " + normOf(v));
-                }
-            }
-        } else {
+        if (true) {
             for (float[] v : baseVectors) {
                 if (Math.abs(normOf(v)) > 1e-5) {
                     scrubbedBaseVectors.add(v);

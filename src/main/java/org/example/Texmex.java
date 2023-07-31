@@ -23,17 +23,17 @@ public class Texmex {
         var topK = groundTruth.get(0).size();
 
         var start = System.nanoTime();
-        var builder = HnswGraphBuilder.create(ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.DOT_PRODUCT, 16, 100, true, 42);
+        var builder = HnswGraphBuilder.create(ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.DOT_PRODUCT, 16, 100, false, 42);
         var hnsw = builder.build(ravv.copy());
         long buildNanos = System.nanoTime() - start;
 
         start = System.nanoTime();
-        FingerMetadata<float[]> fm = new FingerMetadata<>(hnsw, ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.DOT_PRODUCT, 64);
+        FingerMetadata<float[]> fm = null; // new FingerMetadata<>(hnsw, ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.DOT_PRODUCT, 64);
         long fingerNanos = System.nanoTime() - start;
 
         start = System.nanoTime();
 
-        int queryRuns = 10;
+        int queryRuns = 1;
         var pqr = performQueries(queryVectors, groundTruth, ravv, hnsw, fm, topK, queryRuns);
         long queryNanos = System.nanoTime() - start;
         var recall = ((double) pqr.topKFound) / (queryRuns * queryVectors.size() * topK);
@@ -56,7 +56,7 @@ public class Texmex {
         int approxSimilarities = 0;
         for (int k = 0; k < queryRuns; k++) {
             HnswSearcher<float[]> searcher = new HnswSearcher.Builder<>(hnsw, ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.DOT_PRODUCT)
-                        .withFinger(fm)
+                        .withFinger(fm) // fine if fm is null, it's a no-op
                         .build();
             for (int i = 0; i < queryVectors.size(); i++) {
                 var queryVector = queryVectors.get(i);

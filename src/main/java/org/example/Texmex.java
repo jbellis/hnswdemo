@@ -75,10 +75,14 @@ public class Texmex {
     }
 
     private static void computeRecallFor(String pathStr) throws IOException {
-        HdfFile hdf = new HdfFile(Paths.get(pathStr));
-        float[][] baseVectors = (float[][]) hdf.getDatasetByPath("train").getData();
-        float[][] queryVectors = (float[][]) hdf.getDatasetByPath("test").getData();
-        int[][] groundTruth = (int[][]) hdf.getDatasetByPath("neighbors").getData();
+        float[][] baseVectors;
+        float[][] queryVectors;
+        int[][] groundTruth;
+        try (HdfFile hdf = new HdfFile(Paths.get(pathStr))) {
+            baseVectors = (float[][]) hdf.getDatasetByPath("train").getData();
+            queryVectors = (float[][]) hdf.getDatasetByPath("test").getData();
+            groundTruth = (int[][]) hdf.getDatasetByPath("neighbors").getData();
+        }
 
         // verify that vectors are normalized and sane
         List<float[]> scrubbedBaseVectors = new ArrayList<>(baseVectors.length);

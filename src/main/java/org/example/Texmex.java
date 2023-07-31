@@ -9,10 +9,7 @@ import org.example.util.ListRandomAccessVectorValues;
 
 import java.io.IOException;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.IntStream;
 
@@ -83,49 +80,33 @@ public class Texmex {
         List<float[]> scrubbedBaseVectors = new ArrayList<>(baseVectors.length);
         List<float[]> scrubbedQueryVectors = new ArrayList<>(queryVectors.length);
         List<Set<Integer>> gtSet = new ArrayList<>(groundTruth.length);
+        // remove zero vectors, noting that this will change the indexes of the ground truth answers
+        Map<Integer, Integer> rawToScrubbed = new HashMap<>();
+        {
+            int j = 0;
+            for (int i = 0; i < baseVectors.length; i++) {
+                float[] v = baseVectors[i];
+                if (Math.abs(normOf(v)) > 1e-5) {
+                    scrubbedBaseVectors.add(v);
+                    rawToScrubbed.put(i, j++);
+                }
+            }
+        }
+        for (int i = 0; i < queryVectors.length; i++) {
+            float[] v = queryVectors[i];
+            if (Math.abs(normOf(v)) > 1e-5) {
+                scrubbedQueryVectors.add(v);
+                var gt = new HashSet<Integer>();
+                for (int j = 0; j < groundTruth[i].length; j++) {
+                    gt.add(rawToScrubbed.get(groundTruth[i][j]));
+                }
+                gtSet.add(gt);
+            }
+        }
+        // now that the zero vectors are removed, we can normalize
         if (Math.abs(normOf(baseVectors[0]) - 1.0) > 1e-5) {
-            System.out.println("Normalizing vectors for " + pathStr);
-            for (float[] v : baseVectors) {
-                try {
-                    VectorUtil.l2normalize(v);
-                    scrubbedBaseVectors.add(v);
-                } catch (Throwable th) {
-                    // System.out.println("Skipping vector with norm " + normOf(v));
-                }
-            }
-            for (int i = 0; i < queryVectors.length; i++) {
-                float[] v = queryVectors[i];
-                try {
-                    // do it in this order so if the normalize fails for being length 0,
-                    // we don't add it to the query or ground truth sets
-                    VectorUtil.l2normalize(v);
-                    scrubbedQueryVectors.add(v);
-                    var gt = new HashSet<Integer>();
-                    for (int j = 0; j < groundTruth[i].length; j++) {
-                        gt.add(groundTruth[i][j]);
-                    }
-                    gtSet.add(gt);
-                } catch (Throwable th) {
-                    // System.out.println("Skipping vector with norm " + normOf(v));
-                }
-            }
-        } else {
-            for (float[] v : baseVectors) {
-                if (Math.abs(normOf(v)) > 1e-5) {
-                    scrubbedBaseVectors.add(v);
-                }
-            }
-            for (int i = 0; i < queryVectors.length; i++) {
-                float[] v = queryVectors[i];
-                if (Math.abs(normOf(v)) > 1e-5) {
-                    scrubbedQueryVectors.add(v);
-                    var gt = new HashSet<Integer>();
-                    for (int j = 0; j < groundTruth[i].length; j++) {
-                        gt.add(groundTruth[i][j]);
-                    }
-                    gtSet.add(gt);
-                }
-            }
+            normalizeAll(scrubbedBaseVectors);
+            normalizeAll(scrubbedQueryVectors);
         }
         assert scrubbedQueryVectors.size() == gtSet.size();
         baseVectors = null;
@@ -138,6 +119,12 @@ public class Texmex {
         var results = testRecall(scrubbedBaseVectors, scrubbedQueryVectors, gtSet);
         System.out.format("%s: top %d recall %.4f, build %.2fs, finger %.2fs, query %.2fs%n",
                 pathStr, results.topK, results.recall, results.buildNanos / 1_000_000_000.0, results.fingerNanos / 1_000_000_000.0, results.queryNanos / 1_000_000_000.0);
+    }
+
+    private static void normalizeAll(Iterable<float[]> vectors) {
+        for (float[] v : vectors) {
+            VectorUtil.l2normalize(v);
+        }
     }
 
     public static void main(String[] args) {

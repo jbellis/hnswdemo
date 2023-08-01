@@ -3,6 +3,7 @@ package org.example;
 import io.jhdf.HdfFile;
 import org.apache.lucene.index.VectorEncoding;
 import org.apache.lucene.index.VectorSimilarityFunction;
+import org.apache.lucene.util.NamedThreadFactory;
 import org.apache.lucene.util.VectorUtil;
 import org.apache.lucene.util.hnsw.*;
 import org.example.util.ListRandomAccessVectorValues;
@@ -10,34 +11,45 @@ import org.example.util.ListRandomAccessVectorValues;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
 import java.util.stream.IntStream;
 
 /**
  * Tests HNSW against vectors from the Texmex dataset
  */
 public class Texmex {
-    private record Results(int topK, double recall, long buildNanos, long fingerNanos, long queryNanos, int exactSimilarities, int approxSimilarities) { }
-
-    public static Results testRecall(List<float[]> baseVectors, List<float[]> queryVectors, List<Set<Integer>> groundTruth) throws IOException {
+    public static void testRecall(List<float[]> baseVectors, List<float[]> queryVectors, List<Set<Integer>> groundTruth) throws IOException, ExecutionException, InterruptedException {
         var ravv = new ListRandomAccessVectorValues(baseVectors, baseVectors.get(0).length);
-        var topK = groundTruth.get(0).size();
+        var topK = 10; // groundTruth.get(0).size();
 
         var start = System.nanoTime();
-        var builder = HnswGraphBuilder.create(ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.DOT_PRODUCT, 16, 100, true, 42);
-        var hnsw = builder.build(ravv.copy());
+        var builder = ConcurrentHnswGraphBuilder.create(ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.DOT_PRODUCT, 16, 100);
+        int buildThreads = 24;
+        var es = Executors.newFixedThreadPool(
+                buildThreads, new NamedThreadFactory("Concurrent HNSW builder"));
+        var hnsw = builder.buildAsync(ravv.copy(), es, buildThreads).get().getView();
+        es.shutdown();
         long buildNanos = System.nanoTime() - start;
 
         start = System.nanoTime();
         FingerMetadata<float[]> fm = new FingerMetadata<>(hnsw, ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.DOT_PRODUCT, 64);
         long fingerNanos = System.nanoTime() - start;
 
-        start = System.nanoTime();
-
         int queryRuns = 10;
-        var pqr = performQueries(queryVectors, groundTruth, ravv, hnsw, fm, topK, queryRuns);
+        start = System.nanoTime();
+        var pqr = performQueries(queryVectors, groundTruth, ravv, hnsw, null, topK, queryRuns);
         long queryNanos = System.nanoTime() - start;
         var recall = ((double) pqr.topKFound) / (queryRuns * queryVectors.size() * topK);
-        return new Results(topK, recall, buildNanos, fingerNanos, queryNanos, pqr.exactSimilarities, pqr.approxSimilarities);
+        System.out.format("Without Finger: top %d recall %.4f, build %.2fs, finger %.2fs, query %.2fs. %s exact similarity evals and %s approx%n",
+                topK, recall, buildNanos / 1_000_000_000.0, fingerNanos / 1_000_000_000.0, queryNanos / 1_000_000_000.0, pqr.exactSimilarities, pqr.approxSimilarities);
+
+        start = System.nanoTime();
+        pqr = performQueries(queryVectors, groundTruth, ravv, hnsw, fm, topK, queryRuns);
+        queryNanos = System.nanoTime() - start;
+        recall = ((double) pqr.topKFound) / (queryRuns * queryVectors.size() * topK);
+        System.out.format("With Finger: top %d recall %.4f, build %.2fs, finger %.2fs, query %.2fs. %s exact similarity evals and %s approx%n",
+                topK, recall, buildNanos / 1_000_000_000.0, fingerNanos / 1_000_000_000.0, queryNanos / 1_000_000_000.0, pqr.exactSimilarities, pqr.approxSimilarities);
     }
 
     private static float normOf(float[] baseVector) {
@@ -74,7 +86,7 @@ public class Texmex {
         return new QueryResult(topKfound, exactSimilarities, approxSimilarities);
     }
 
-    private static void computeRecallFor(String pathStr) throws IOException {
+    private static void computeRecallFor(String pathStr) throws IOException, ExecutionException, InterruptedException {
         float[][] baseVectors;
         float[][] queryVectors;
         int[][] groundTruth;
@@ -124,9 +136,7 @@ public class Texmex {
         System.out.format("%s: %d base and %d query vectors loaded, dimensions %d%n",
                 pathStr, scrubbedBaseVectors.size(), scrubbedQueryVectors.size(), scrubbedBaseVectors.get(0).length);
 
-        var results = testRecall(scrubbedBaseVectors, scrubbedQueryVectors, gtSet);
-        System.out.format("%s: top %d recall %.4f, build %.2fs, finger %.2fs, query %.2fs. %s exact similarity evals and %s approx%n",
-                pathStr, results.topK, results.recall, results.buildNanos / 1_000_000_000.0, results.fingerNanos / 1_000_000_000.0, results.queryNanos / 1_000_000_000.0, results.exactSimilarities, results.approxSimilarities);
+        testRecall(scrubbedBaseVectors, scrubbedQueryVectors, gtSet);
     }
 
     private static void normalizeAll(Iterable<float[]> vectors) {
@@ -140,31 +150,31 @@ public class Texmex {
 
         new Thread(() -> {
             try {
-                computeRecallFor("hdf5/glove-100-angular.hdf5");
-            } catch (Throwable e) {
-                throw new RuntimeException(e);
-            }
-        }).start();
-        new Thread(() -> {
-            try {
-                computeRecallFor("hdf5/glove-200-angular.hdf5");
-            } catch (Throwable e) {
-                throw new RuntimeException(e);
-            }
-        }).start();
-        new Thread(() -> {
-            try {
-                computeRecallFor("hdf5/deep-image-96-angular.hdf5");
-            } catch (Throwable e) {
-                throw new RuntimeException(e);
-            }
-        }).start();
-        new Thread(() -> {
-            try {
                 computeRecallFor("hdf5/nytimes-256-angular.hdf5");
             } catch (Throwable e) {
                 throw new RuntimeException(e);
             }
-        }).start();
+        }).run();
+//        new Thread(() -> {
+//            try {
+//                computeRecallFor("hdf5/glove-100-angular.hdf5");
+//            } catch (Throwable e) {
+//                throw new RuntimeException(e);
+//            }
+//        }).run();
+//        new Thread(() -> {
+//            try {
+//                computeRecallFor("hdf5/glove-200-angular.hdf5");
+//            } catch (Throwable e) {
+//                throw new RuntimeException(e);
+//            }
+//        }).run();
+//        new Thread(() -> {
+//            try {
+//                computeRecallFor("hdf5/deep-image-96-angular.hdf5");
+//            } catch (Throwable e) {
+//                throw new RuntimeException(e);
+//            }
+//        }).start();
     }
 }

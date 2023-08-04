@@ -9,6 +9,7 @@ import org.apache.lucene.util.hnsw.*;
 import org.example.util.ListRandomAccessVectorValues;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
@@ -21,35 +22,45 @@ import java.util.stream.IntStream;
 public class Texmex {
     public static void testRecall(List<float[]> baseVectors, List<float[]> queryVectors, List<Set<Integer>> groundTruth) throws IOException, ExecutionException, InterruptedException {
         var ravv = new ListRandomAccessVectorValues(baseVectors, baseVectors.get(0).length);
-        var topK = 10; // groundTruth.get(0).size();
+        var topK = groundTruth.get(0).size();
 
         var start = System.nanoTime();
         var builder = ConcurrentHnswGraphBuilder.create(ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.DOT_PRODUCT, 16, 100);
         int buildThreads = 24;
         var es = Executors.newFixedThreadPool(
                 buildThreads, new NamedThreadFactory("Concurrent HNSW builder"));
-        var hnsw = builder.buildAsync(ravv.copy(), es, buildThreads).get().getView();
-        es.shutdown();
+        var hnsw = builder.buildAsync(ravv.copy(), es, buildThreads).get();
+        var vBuilder = new VamanaGraphBuilder<>(hnsw, ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.DOT_PRODUCT, 100);
         long buildNanos = System.nanoTime() - start;
-
-        start = System.nanoTime();
-        FingerMetadata<float[]> fm = new FingerMetadata<>(hnsw, ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.DOT_PRODUCT, 64);
-        long fingerNanos = System.nanoTime() - start;
 
         int queryRuns = 10;
         start = System.nanoTime();
-        var pqr = performQueries(queryVectors, groundTruth, ravv, hnsw, null, topK, queryRuns);
+        var pqr = performQueries(queryVectors, groundTruth, ravv, hnsw.getView(), topK, queryRuns);
         long queryNanos = System.nanoTime() - start;
         var recall = ((double) pqr.topKFound) / (queryRuns * queryVectors.size() * topK);
-        System.out.format("Without Finger: top %d recall %.4f, build %.2fs, finger %.2fs, query %.2fs. %s exact similarity evals and %s approx%n",
-                topK, recall, buildNanos / 1_000_000_000.0, fingerNanos / 1_000_000_000.0, queryNanos / 1_000_000_000.0, pqr.exactSimilarities, pqr.approxSimilarities);
+        System.out.format("HNSW: top %d recall %.4f, build %.2fs, query %.2fs. %s nodes visited%n",
+                topK, recall, buildNanos / 1_000_000_000.0, queryNanos / 1_000_000_000.0, pqr.nodesVisited);
 
-        start = System.nanoTime();
-        pqr = performQueries(queryVectors, groundTruth, ravv, hnsw, fm, topK, queryRuns);
-        queryNanos = System.nanoTime() - start;
-        recall = ((double) pqr.topKFound) / (queryRuns * queryVectors.size() * topK);
-        System.out.format("With Finger: top %d recall %.4f, build %.2fs, finger %.2fs, query %.2fs. %s exact similarity evals and %s approx%n",
-                topK, recall, buildNanos / 1_000_000_000.0, fingerNanos / 1_000_000_000.0, queryNanos / 1_000_000_000.0, pqr.exactSimilarities, pqr.approxSimilarities);
+        IntStream.range(1, 4).forEach(i -> {
+            float alpha = (float) Math.pow(2, i);
+            var vStart = System.nanoTime();
+            QueryResult vqr;
+            long vBuildNanos;
+            try {
+                var vamona = es.submit(() -> vBuilder.buildVamana(alpha)).get();
+                vBuildNanos = System.nanoTime() - vStart;
+                vStart = System.nanoTime();
+                vqr = performQueries(queryVectors, groundTruth, ravv, vamona.getView(), topK, queryRuns);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            var vQueryNanos = System.nanoTime() - vStart;
+            var vRecall = ((double) vqr.topKFound) / (queryRuns * queryVectors.size() * topK);
+            System.out.format("With Vamona@%s: top %d recall %.4f, build %.2fs, query %.2fs. %s nodes visited%n",
+                    alpha, topK, vRecall, vBuildNanos / 1_000_000_000.0, vQueryNanos / 1_000_000_000.0, vqr.nodesVisited);
+        });
+
+        es.shutdown();
     }
 
     private static float normOf(float[] baseVector) {
@@ -60,30 +71,24 @@ public class Texmex {
         return (float) Math.sqrt(norm);
     }
 
-    private record QueryResult(int topKFound, int exactSimilarities, int approxSimilarities) { }
+    private record QueryResult(int topKFound, int nodesVisited) { }
 
-    private static QueryResult performQueries(List<float[]> queryVectors, List<Set<Integer>> groundTruth, ListRandomAccessVectorValues ravv, HnswGraph hnsw, FingerMetadata<float[]> fm, int topK, int queryRuns) throws IOException {
+    private static QueryResult performQueries(List<float[]> queryVectors, List<Set<Integer>> groundTruth, ListRandomAccessVectorValues ravv, HnswGraph hnsw, int topK, int queryRuns) throws IOException {
         int topKfound = 0;
-        int exactSimilarities = 0;
-        int approxSimilarities = 0;
+        int nodesVisited = 0;
         for (int k = 0; k < queryRuns; k++) {
-            HnswSearcher<float[]> searcher = new HnswSearcher.Builder<>(hnsw, ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.DOT_PRODUCT)
-                        .withFinger(fm)
-                        .build();
             for (int i = 0; i < queryVectors.size(); i++) {
                 var queryVector = queryVectors.get(i);
                 NeighborQueue nn;
-                nn = searcher.search(queryVector, topK, null, Integer.MAX_VALUE);
-
+                nn = HnswGraphSearcher.search(queryVector, topK, ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.DOT_PRODUCT, hnsw, null, Integer.MAX_VALUE);
                 var gt = groundTruth.get(i);
                 int[] resultNodes = nn.nodes();
                 var n = IntStream.range(0, Math.min(nn.size(), topK)).filter(j -> gt.contains(resultNodes[j])).count();
                 topKfound += n;
+                nodesVisited += nn.visitedCount();
             }
-            exactSimilarities += searcher.exactSimilarityCalls.intValue();
-            approxSimilarities += searcher.approxSimilarityCalls.intValue();
         }
-        return new QueryResult(topKfound, exactSimilarities, approxSimilarities);
+        return new QueryResult(topKfound, nodesVisited);
     }
 
     private static void computeRecallFor(String pathStr) throws IOException, ExecutionException, InterruptedException {

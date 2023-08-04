@@ -14,6 +14,8 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.LongAdder;
+import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
 /**
@@ -35,13 +37,13 @@ public class Texmex {
 
         int queryRuns = 10;
         start = System.nanoTime();
-        var pqr = performQueries(queryVectors, groundTruth, ravv, hnsw.getView(), topK, queryRuns);
+        var pqr = performQueries(queryVectors, groundTruth, ravv, hnsw::getView, topK, queryRuns);
         long queryNanos = System.nanoTime() - start;
         var recall = ((double) pqr.topKFound) / (queryRuns * queryVectors.size() * topK);
         System.out.format("HNSW: top %d recall %.4f, build %.2fs, query %.2fs. %s nodes visited%n",
                 topK, recall, buildNanos / 1_000_000_000.0, queryNanos / 1_000_000_000.0, pqr.nodesVisited);
 
-        IntStream.range(1, 4).forEach(i -> {
+        IntStream.range(1, 5).forEach(i -> {
             float alpha = (float) Math.pow(2, i);
             var vStart = System.nanoTime();
             QueryResult vqr;
@@ -50,7 +52,7 @@ public class Texmex {
                 var vamona = es.submit(() -> vBuilder.buildVamana(alpha)).get();
                 vBuildNanos = System.nanoTime() - vStart;
                 vStart = System.nanoTime();
-                vqr = performQueries(queryVectors, groundTruth, ravv, vamona.getView(), topK, queryRuns);
+                vqr = performQueries(queryVectors, groundTruth, ravv, vamona::getView, topK, queryRuns);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -73,22 +75,26 @@ public class Texmex {
 
     private record QueryResult(int topKFound, int nodesVisited) { }
 
-    private static QueryResult performQueries(List<float[]> queryVectors, List<Set<Integer>> groundTruth, ListRandomAccessVectorValues ravv, HnswGraph hnsw, int topK, int queryRuns) throws IOException {
-        int topKfound = 0;
-        int nodesVisited = 0;
+    private static QueryResult performQueries(List<float[]> queryVectors, List<Set<Integer>> groundTruth, ListRandomAccessVectorValues ravv, Supplier<HnswGraph> graphSupplier, int topK, int queryRuns) {
+        LongAdder topKfound = new LongAdder();
+        LongAdder nodesVisited = new LongAdder();
         for (int k = 0; k < queryRuns; k++) {
-            for (int i = 0; i < queryVectors.size(); i++) {
+            IntStream.range(0, queryVectors.size()).parallel().forEach(i -> {
                 var queryVector = queryVectors.get(i);
                 NeighborQueue nn;
-                nn = HnswGraphSearcher.search(queryVector, topK, ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.DOT_PRODUCT, hnsw, null, Integer.MAX_VALUE);
+                try {
+                    nn = HnswGraphSearcher.search(queryVector, topK, ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.DOT_PRODUCT, graphSupplier.get(), null, Integer.MAX_VALUE);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
                 var gt = groundTruth.get(i);
                 int[] resultNodes = nn.nodes();
                 var n = IntStream.range(0, Math.min(nn.size(), topK)).filter(j -> gt.contains(resultNodes[j])).count();
-                topKfound += n;
-                nodesVisited += nn.visitedCount();
-            }
+                topKfound.add(n);
+                nodesVisited.add(nn.visitedCount());
+            });
         }
-        return new QueryResult(topKfound, nodesVisited);
+        return new QueryResult((int) topKfound.sum(), (int) nodesVisited.sum());
     }
 
     private static void computeRecallFor(String pathStr) throws IOException, ExecutionException, InterruptedException {

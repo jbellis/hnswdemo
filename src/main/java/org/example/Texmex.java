@@ -108,13 +108,16 @@ public class Texmex {
                 var queryVector = queryVectors.get(i);
                 NeighborQueue nn;
                 try {
-                    nn = HnswGraphSearcher.search(queryVector, topK, ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.DOT_PRODUCT, graphSupplier.get(), null, Integer.MAX_VALUE);
+                    nn = HnswGraphSearcher.search(queryVector, 4 * topK, ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.DOT_PRODUCT, graphSupplier.get(), null, Integer.MAX_VALUE);
                 } catch (IOException e) {
                     throw new UncheckedIOException(e);
                 }
                 var gt = groundTruth.get(i);
-                int[] resultNodes = nn.nodes();
-                var n = IntStream.range(0, Math.min(nn.size(), topK)).filter(j -> gt.contains(resultNodes[j])).count();
+                var a = new int[nn.size()];
+                for (int j = a.length - 1; j >= 0; j--) {
+                    a[j] = nn.pop();
+                }
+                var n = IntStream.range(0, Math.min(a.length, topK)).filter(j -> gt.contains(a[j])).count();
                 topKfound.add(n);
                 nodesVisited.add(nn.visitedCount());
             });

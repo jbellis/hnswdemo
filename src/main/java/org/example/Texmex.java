@@ -52,16 +52,16 @@ public class Texmex {
             long vBuildNanos;
             try {
                 // x2 b/c OnHeapHnswGraph doubles connections on L0
-                var vamona = es.submit(() -> vBuilder.buildVamana(2 * M, alpha)).get();
+                var vamana = es.submit(() -> vBuilder.buildVamana(2 * M, alpha)).get();
                 vBuildNanos = System.nanoTime() - vStart;
                 vStart = System.nanoTime();
-                vqr = performQueries(queryVectors, groundTruth, ravv, vamona::getView, topK, queryRuns);
+                vqr = vamanaQueries(vBuilder, vamana, queryVectors, groundTruth, ravv, topK, queryRuns);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
             var vQueryNanos = System.nanoTime() - vStart;
             var vRecall = ((double) vqr.topKFound) / (queryRuns * queryVectors.size() * topK);
-            System.out.format("With Vamona@%s: top %d recall %.4f, build %.2fs, query %.2fs. %s nodes visited%n",
+            System.out.format("With Vamana@%s: top %d recall %.4f, build %.2fs, query %.2fs. %s nodes visited%n",
                     alpha, topK, vRecall, vBuildNanos / 1_000_000_000.0, vQueryNanos / 1_000_000_000.0, vqr.nodesVisited);
         });
 
@@ -77,6 +77,28 @@ public class Texmex {
     }
 
     private record ResultSummary(int topKFound, int nodesVisited) { }
+
+    private static ResultSummary vamanaQueries(VamanaGraphBuilder<float[]> builder, ConcurrentVamanaGraph vamana, List<float[]> queryVectors, List<Set<Integer>> groundTruth, ListRandomAccessVectorValues ravv, int topK, int queryRuns) {
+        LongAdder topKfound = new LongAdder();
+        LongAdder nodesVisited = new LongAdder();
+        for (int k = 0; k < queryRuns; k++) {
+            IntStream.range(0, queryVectors.size()).parallel().forEach(i -> {
+                var queryVector = queryVectors.get(i);
+                VamanaGraphBuilder.QueryResult qr;
+                try {
+                    qr = builder.greedySearch(vamana, queryVector, 16 * topK);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+                var gt = groundTruth.get(i);
+                int[] resultNodes = qr.results.nodesCopy();
+                var n = IntStream.range(0, Math.min(resultNodes.length, topK)).filter(j -> gt.contains(resultNodes[j])).count();
+                topKfound.add(n);
+                nodesVisited.add(qr.visitedCount);
+            });
+        }
+        return new ResultSummary((int) topKfound.sum(), (int) nodesVisited.sum());
+    }
 
     private static ResultSummary performQueries(List<float[]> queryVectors, List<Set<Integer>> groundTruth, ListRandomAccessVectorValues ravv, Supplier<HnswGraph> graphSupplier, int topK, int queryRuns) {
         LongAdder topKfound = new LongAdder();

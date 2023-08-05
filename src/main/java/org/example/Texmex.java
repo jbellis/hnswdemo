@@ -25,14 +25,16 @@ public class Texmex {
     public static void testRecall(List<float[]> baseVectors, List<float[]> queryVectors, List<Set<Integer>> groundTruth) throws IOException, ExecutionException, InterruptedException {
         var ravv = new ListRandomAccessVectorValues(baseVectors, baseVectors.get(0).length);
         var topK = groundTruth.get(0).size();
+        int M = 16;
+        int beamWidth = 100;
 
         var start = System.nanoTime();
-        var builder = ConcurrentHnswGraphBuilder.create(ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.DOT_PRODUCT, 16, 100);
+        var builder = ConcurrentHnswGraphBuilder.create(ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.DOT_PRODUCT, M, beamWidth);
         int buildThreads = 24;
         var es = Executors.newFixedThreadPool(
                 buildThreads, new NamedThreadFactory("Concurrent HNSW builder"));
         var hnsw = builder.buildAsync(ravv.copy(), es, buildThreads).get();
-        var vBuilder = new VamanaGraphBuilder<>(hnsw, ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.DOT_PRODUCT, 100);
+        var vBuilder = new VamanaGraphBuilder<>(hnsw, ravv, VectorEncoding.FLOAT32, VectorSimilarityFunction.DOT_PRODUCT, 2 * beamWidth);
         long buildNanos = System.nanoTime() - start;
 
         int queryRuns = 10;
@@ -46,10 +48,11 @@ public class Texmex {
         IntStream.range(1, 5).forEach(i -> {
             float alpha = (float) Math.pow(2, i);
             var vStart = System.nanoTime();
-            QueryResult vqr;
+            ResultSummary vqr;
             long vBuildNanos;
             try {
-                var vamona = es.submit(() -> vBuilder.buildVamana(alpha)).get();
+                // x2 b/c OnHeapHnswGraph doubles connections on L0
+                var vamona = es.submit(() -> vBuilder.buildVamana(2 * M, alpha)).get();
                 vBuildNanos = System.nanoTime() - vStart;
                 vStart = System.nanoTime();
                 vqr = performQueries(queryVectors, groundTruth, ravv, vamona::getView, topK, queryRuns);
@@ -73,9 +76,9 @@ public class Texmex {
         return (float) Math.sqrt(norm);
     }
 
-    private record QueryResult(int topKFound, int nodesVisited) { }
+    private record ResultSummary(int topKFound, int nodesVisited) { }
 
-    private static QueryResult performQueries(List<float[]> queryVectors, List<Set<Integer>> groundTruth, ListRandomAccessVectorValues ravv, Supplier<HnswGraph> graphSupplier, int topK, int queryRuns) {
+    private static ResultSummary performQueries(List<float[]> queryVectors, List<Set<Integer>> groundTruth, ListRandomAccessVectorValues ravv, Supplier<HnswGraph> graphSupplier, int topK, int queryRuns) {
         LongAdder topKfound = new LongAdder();
         LongAdder nodesVisited = new LongAdder();
         for (int k = 0; k < queryRuns; k++) {
@@ -94,7 +97,7 @@ public class Texmex {
                 nodesVisited.add(nn.visitedCount());
             });
         }
-        return new QueryResult((int) topKfound.sum(), (int) nodesVisited.sum());
+        return new ResultSummary((int) topKfound.sum(), (int) nodesVisited.sum());
     }
 
     private static void computeRecallFor(String pathStr) throws IOException, ExecutionException, InterruptedException {
@@ -140,6 +143,7 @@ public class Texmex {
             normalizeAll(scrubbedQueryVectors);
         }
         assert scrubbedQueryVectors.size() == gtSet.size();
+        // clear the reference so it can be GC'd
         baseVectors = null;
         queryVectors = null;
         groundTruth = null;
